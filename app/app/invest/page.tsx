@@ -3,7 +3,8 @@ import { all } from "@/lib/db";
 import { INVESTMENT_KINDS, kindLabel, naira } from "@/lib/money";
 import { PILLARS } from "@/lib/packages";
 import { hasPillar } from "@/lib/students";
-import { ActionForm, ConfirmButton, Locked, SubmitButton, input } from "@/components/app/ui";
+import { ActionForm, ConfirmButton, Locked, SubmitButton } from "@/components/app/ui";
+import { input } from "@/lib/styles";
 import { addHolding, deleteHolding, updateHoldingValue } from "../actions";
 
 export const dynamic = "force-dynamic";

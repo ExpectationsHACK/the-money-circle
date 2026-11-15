@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
 import { Logo } from "@/components/Chrome";
 import { BottomNav, SideNav, type NavItem } from "@/components/app/AppNav";
+import { Toaster } from "@/components/finance/cells";
 import { requireStudent } from "@/lib/auth";
 import { env } from "@/lib/env";
-import { firstName, hasPillar, packageOf, programmeProgress } from "@/lib/students";
+import { firstName, hasPillar, packageOf, programmeProgress, touchStudent } from "@/lib/students";
 
 export const metadata: Metadata = { title: "My Money Circle", robots: { index: false } };
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireStudent();
+  await touchStudent(s).catch(() => undefined);
   const pkg = packageOf(s);
   const prog = programmeProgress(s);
 
   const items: NavItem[] = [
     { href: "/app", label: "Home", icon: "◎" },
-    { href: "/app/budget", label: "Budget", icon: "₦", locked: !hasPillar(s, 2) },
-    { href: "/app/goals", label: "Goals", icon: "🌱", locked: !hasPillar(s, 3) },
+    { href: "/app/budget", label: "Budget", icon: "📒", locked: !hasPillar(s, 2) },
+    { href: "/app/expenses", label: "Expenses", icon: "🧾", locked: !hasPillar(s, 2) },
+    { href: "/app/savings", label: "Savings", icon: "🌱", locked: !hasPillar(s, 3) },
     { href: "/app/invest", label: "Invest", icon: "📈", locked: !hasPillar(s, 3) },
     { href: "/app/launchpad", label: "LaunchPad", icon: "🚀", locked: !hasPillar(s, 4) },
     { href: "/app/learn", label: "Learn", icon: "🎓" },
@@ -69,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="mx-auto max-w-5xl px-4 pb-28 pt-6 sm:px-6 lg:pb-16 lg:pt-10">{children}</main>
       </div>
       <BottomNav items={mobile} />
+      <Toaster />
     </div>
   );
 }

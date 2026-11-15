@@ -5,9 +5,6 @@ import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/app/app/actions";
 
-export const input =
-  "block w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-base outline-none transition placeholder:text-muted/60 focus:border-forest focus:ring-2 focus:ring-forest/15";
-
 export function SubmitButton({
   children,
   pendingText = "Saving…",
@@ -65,6 +62,11 @@ export function ActionForm({
         <p role="status" className="mt-2 text-sm font-medium text-moss">
           {state.ok}
         </p>
+      )}
+      {(state as { link?: string } | null)?.link && (
+        <a href={(state as { link: string }).link} className="mt-1 block break-all text-xs font-semibold text-moss underline">
+          Dev: open the link
+        </a>
       )}
     </form>
   );

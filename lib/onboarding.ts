@@ -119,11 +119,14 @@ export async function enrollStudent(input: EnrollmentInput): Promise<EnrollmentR
   }
   // Atomic claim: only one concurrent delivery wins the insert/update.
   const claimed = existing
-    ? await run("UPDATE enrollments SET status = 'processing', updated_at = ? WHERE reference = ? AND updated_at = ?", [t, input.reference, existing.updated_at])
+    ? await run(
+        "UPDATE enrollments SET status = 'processing', channel = ?, amount_naira = ?, full_name = ?, phone = ?, updated_at = ? WHERE reference = ? AND updated_at = ?",
+        [input.channel, input.amountNaira, input.fullName, input.phone, t, input.reference, existing.updated_at],
+      )
     : await run(
-        `INSERT OR IGNORE INTO enrollments (reference, email, offer_slug, amount_naira, channel, status, notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'processing', ?, ?, ?)`,
-        [input.reference, input.email.toLowerCase(), input.offerSlug, input.amountNaira, input.channel, input.notes ?? null, t, t],
+        `INSERT OR IGNORE INTO enrollments (reference, email, full_name, phone, offer_slug, amount_naira, channel, status, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?)`,
+        [input.reference, input.email.toLowerCase(), input.fullName, input.phone, input.offerSlug, input.amountNaira, input.channel, input.notes ?? null, t, t],
       );
   if (!claimed) return { status: "skipped", reference: input.reference, issues: ["Another delivery is processing this payment"], steps };
 
@@ -261,13 +264,13 @@ export async function recordPendingTransfer(input: Omit<EnrollmentInput, "channe
   const { pkg, offer } = found;
   const t = now();
   await run(
-    `INSERT OR IGNORE INTO enrollments (reference, email, offer_slug, amount_naira, channel, status, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'bank-transfer', 'awaiting-transfer', ?, ?, ?)`,
-    [input.reference, input.email.toLowerCase(), input.offerSlug, input.amountNaira, input.notes ?? null, t, t],
+    `INSERT OR IGNORE INTO enrollments (reference, email, full_name, phone, offer_slug, amount_naira, channel, status, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'bank-transfer', 'awaiting-transfer', ?, ?, ?)`,
+    [input.reference, input.email.toLowerCase(), input.fullName, input.phone, input.offerSlug, input.amountNaira, input.notes ?? null, t, t],
   );
 
   const q = new URLSearchParams({ ref: input.reference, name: input.fullName, email: input.email, phone: input.phone, offer: input.offerSlug });
-  const approveUrl = `${env.siteUrl()}/admin?${q.toString()}`;
+  const approveUrl = `${env.siteUrl()}/admin/enrollments?${q.toString()}#approve`;
   const title = `Bank transfer to verify: ${input.fullName} → ${pkg.name}`;
   const rows: [string, string][] = [
     ["Name", input.fullName],

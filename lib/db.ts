@@ -86,7 +86,110 @@ CREATE TABLE IF NOT EXISTS milestones (
   sort INTEGER NOT NULL DEFAULT 0,
   done_at TEXT
 );
+CREATE TABLE IF NOT EXISTS courses (
+  id TEXT PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  emoji TEXT NOT NULL DEFAULT '📘',
+  tag TEXT NOT NULL DEFAULT '',
+  pillar INTEGER NOT NULL DEFAULT 1,
+  sort INTEGER NOT NULL DEFAULT 0,
+  published INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS modules (
+  id TEXT PRIMARY KEY,
+  course_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS lessons (
+  id TEXT PRIMARY KEY,
+  course_id TEXT NOT NULL,
+  module_id TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  title TEXT NOT NULL,
+  video_url TEXT,
+  body TEXT NOT NULL DEFAULT '',
+  minutes INTEGER NOT NULL DEFAULT 5,
+  sort INTEGER NOT NULL DEFAULT 0,
+  published INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (course_id, slug)
+);
+CREATE TABLE IF NOT EXISTS lesson_progress (
+  student_id TEXT NOT NULL,
+  lesson_id TEXT NOT NULL,
+  completed_at TEXT NOT NULL,
+  PRIMARY KEY (student_id, lesson_id)
+);
+CREATE TABLE IF NOT EXISTS coach_notes (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS categories (
+  student_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  emoji TEXT NOT NULL DEFAULT '🧾',
+  bucket TEXT NOT NULL DEFAULT 'wants',
+  sort INTEGER NOT NULL DEFAULT 0,
+  archived INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (student_id, key)
+);
+CREATE TABLE IF NOT EXISTS incomes (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  month TEXT NOT NULL,
+  source TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  received INTEGER NOT NULL DEFAULT 0,
+  sort INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS incomes_student_month ON incomes (student_id, month);
+CREATE TABLE IF NOT EXISTS month_meta (
+  student_id TEXT NOT NULL,
+  month TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  initialized INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (student_id, month)
+);
+CREATE TABLE IF NOT EXISTS recurring (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  category TEXT NOT NULL,
+  method TEXT NOT NULL DEFAULT 'transfer',
+  day INTEGER NOT NULL DEFAULT 1,
+  active INTEGER NOT NULL DEFAULT 1,
+  last_month TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS goal_deposits (
+  id TEXT PRIMARY KEY,
+  goal_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  deposited_on TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS deposits_goal ON goal_deposits (goal_id, deposited_on);
 `;
+
+/** Additive changes for databases created by earlier versions. Each runs once; "duplicate column" errors are ignored. */
+const MIGRATIONS = [
+  "ALTER TABLE students ADD COLUMN last_seen_at TEXT",
+  "ALTER TABLE enrollments ADD COLUMN full_name TEXT",
+  "ALTER TABLE enrollments ADD COLUMN phone TEXT",
+  "ALTER TABLE expenses ADD COLUMN method TEXT NOT NULL DEFAULT 'transfer'",
+  "ALTER TABLE expenses ADD COLUMN recurring_id TEXT",
+  "ALTER TABLE goals ADD COLUMN emoji TEXT NOT NULL DEFAULT '🎯'",
+  "ALTER TABLE goals ADD COLUMN achieved_at TEXT",
+];
 
 const g = globalThis as unknown as { __tmcDb?: Client; __tmcDbReady?: Promise<void> };
 
@@ -105,7 +208,9 @@ function client(): Client {
 
 async function ready(): Promise<Client> {
   const c = client();
-  g.__tmcDbReady ??= c.executeMultiple(SCHEMA);
+  g.__tmcDbReady ??= c.executeMultiple(SCHEMA).then(async () => {
+    for (const m of MIGRATIONS) await c.execute(m).catch(() => undefined);
+  });
   await g.__tmcDbReady;
   return c;
 }

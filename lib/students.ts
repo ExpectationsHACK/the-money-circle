@@ -13,6 +13,7 @@ export interface Student {
   monthly_income: number | null;
   started_at: string;
   created_at: string;
+  last_seen_at: string | null;
 }
 
 export function packageOf(s: Student): Package {
@@ -101,6 +102,12 @@ export async function upsertStudentFromEnrollment(input: {
   return (await getStudentById(existing.id))!;
 }
 
+/** Records activity at most every 10 minutes (powers "inactive students" in the admin). */
+export async function touchStudent(s: Student) {
+  if (s.last_seen_at && Date.now() - new Date(s.last_seen_at).getTime() < 10 * 60_000) return;
+  await run("UPDATE students SET last_seen_at = ? WHERE id = ?", [now(), s.id]);
+}
+
 export async function setMonthlyIncome(studentId: string, income: number) {
   await run("UPDATE students SET monthly_income = ? WHERE id = ?", [income, studentId]);
 }
@@ -125,29 +132,67 @@ export async function seedSampleData(studentId: string) {
     [10, 7000, "personal", "Haircut"], [11, 22000, "food", "Groceries"], [12, 8000, "utilities", "DStv"],
   ];
   await batch([
-    ...budget.map(([c, a]) => ({ sql: "INSERT OR REPLACE INTO budgets VALUES (?, ?, ?, ?)", args: [studentId, month, c, a] })),
+    ...budget.map(([c, a]) => ({ sql: "INSERT OR REPLACE INTO budgets (student_id, month, category, amount) VALUES (?, ?, ?, ?)", args: [studentId, month, c, a] })),
     ...expenses.map(([dd, a, c, n]) => ({
-      sql: "INSERT INTO expenses VALUES (?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO expenses (id, student_id, spent_on, amount, category, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [id(), studentId, day(dd), a, c, n, t],
     })),
-    ...([
-      ["Emergency fund (3 months)", 1200000, 420000, "PiggyVest"],
-      ["New laptop for business", 650000, 180000, "Cowrywise"],
-      ["December in the village", 300000, 95000, "PiggyVest"],
-    ] as const).map(([n, tg, s, p]) => ({
-      sql: "INSERT INTO goals (id, student_id, name, target, saved, due_on, platform, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      args: [id(), studentId, n, tg, s, null, p, t],
-    })),
+    ...seedGoals(studentId, t),
     ...([
       ["Stanbic IBTC Money Market Fund", "money-market", 250000, 263500],
       ["FGN 364-day Treasury Bill", "treasury-bills", 300000, 318000],
       ["MTN Nigeria shares", "stocks", 120000, 131400],
       ["ARM Ethical Fund", "mutual-funds", 80000, 84200],
     ] as const).map(([n, k, inv, cur]) => ({
-      sql: "INSERT INTO holdings VALUES (?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO holdings (id, student_id, name, kind, invested, current_value, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [id(), studentId, n, k, inv, cur, t],
     })),
+    { sql: "INSERT INTO incomes (id, student_id, month, source, amount, received, sort) VALUES (?, ?, ?, 'Salary', 550000, 1, 0)", args: [id(), studentId, month] },
+    { sql: "INSERT INTO incomes (id, student_id, month, source, amount, received, sort) VALUES (?, ?, ?, 'Side hustle (graphics)', 100000, 0, 1)", args: [id(), studentId, month] },
+    { sql: "INSERT OR IGNORE INTO month_meta (student_id, month, notes, initialized) VALUES (?, ?, '', 1)", args: [studentId, month] },
+    ...([
+      ["DStv Compact", 12500, "utilities", 12],
+      ["MTN data plan", 12000, "utilities", 4],
+      ["Tithe", 30000, "giving", 9],
+    ] as const).map(([n, a, c, d]) => ({
+      sql: "INSERT INTO recurring (id, student_id, name, amount, category, method, day, active, last_month, created_at) VALUES (?, ?, ?, ?, ?, 'transfer', ?, 1, ?, ?)",
+      args: [id(), studentId, n, a, c, d, month, t],
+    })),
   ]);
+}
+
+function monthsAgo(n: number, day: number): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - n);
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(Math.min(day, last, n === 0 ? new Date().getDate() : 31)).padStart(2, "0")}`;
+}
+
+/** Three goals with a realistic deposit history over the last few months. */
+function seedGoals(studentId: string, t: string) {
+  const goals: { name: string; emoji: string; target: number; platform: string; dueMonths: number; deposits: [number, number, number][] }[] = [
+    { name: "Emergency fund", emoji: "🛟", target: 1200000, platform: "PiggyVest", dueMonths: 8, deposits: [[4, 1, 150000], [3, 28, 70000], [2, 28, 70000], [1, 28, 70000], [0, 2, 60000]] },
+    { name: "New laptop for business", emoji: "💻", target: 650000, platform: "Cowrywise", dueMonths: 4, deposits: [[3, 5, 50000], [2, 5, 45000], [1, 5, 45000], [0, 5, 40000]] },
+    { name: "December in the village", emoji: "🎄", target: 300000, platform: "PiggyVest", dueMonths: 1, deposits: [[2, 15, 30000], [1, 15, 35000], [0, 10, 30000]] },
+  ];
+  return goals.flatMap((g) => {
+    const gid = id();
+    const due = new Date();
+    due.setMonth(due.getMonth() + g.dueMonths);
+    const created = monthsAgo(Math.max(...g.deposits.map((d) => d[0])), 1);
+    const saved = g.deposits.reduce((a, d) => a + d[2], 0);
+    return [
+      {
+        sql: "INSERT INTO goals (id, student_id, name, emoji, target, saved, due_on, platform, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        args: [gid, studentId, g.name, g.emoji, g.target, saved, due.toISOString().slice(0, 10), g.platform, `${created}T09:00:00.000Z`],
+      },
+      ...g.deposits.map(([ago, day, amt], i) => ({
+        sql: "INSERT INTO goal_deposits (id, goal_id, student_id, amount, deposited_on, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        args: [id(), gid, studentId, amt, monthsAgo(ago, day), i === 0 && ago >= 3 ? "Salary day" : "", t],
+      })),
+    ];
+  });
 }
 
 export async function countRows(table: "expenses" | "goals" | "holdings" | "budgets", studentId: string): Promise<number> {

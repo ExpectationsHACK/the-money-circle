@@ -2,11 +2,13 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { all, one } from "@/lib/db";
 import { env } from "@/lib/env";
-import { category, currentMonth, greeting, monthLabel, naira, pct } from "@/lib/money";
+import { currentMonth, greeting, monthLabel, naira, pct, today } from "@/lib/money";
 import { firstName, hasPillar, packageOf, programmeProgress } from "@/lib/students";
 import { Bar } from "@/components/app/ui";
-import { ExpenseForm } from "@/components/app/ExpenseForm";
+import { QuickExpense } from "@/components/finance/QuickExpense";
+import { categoryLookup, getCategories, monthIncomeTotal } from "@/lib/finance";
 import { loadSampleData } from "./actions";
+import { continueLearning } from "@/lib/learning";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,10 @@ export default async function Dashboard() {
     one<{ done: number; n: number }>("SELECT COALESCE(SUM(done),0) done, COUNT(*) n FROM milestones WHERE student_id = ?", [s.id]),
     one<{ n: number }>("SELECT COUNT(*) n FROM expenses WHERE student_id = ?", [s.id]),
   ]);
+  const learning = await continueLearning(s.id, pkg.pillars);
+  const categories = p2 ? await getCategories(s.id) : [];
+  const category = categoryLookup(categories);
+  const income = await monthIncomeTotal(s.id, month, s.monthly_income ? Number(s.monthly_income) : null);
 
   const spent = Number(spentRow?.v ?? 0);
   const budget = Number(budgetRow?.v ?? 0);
@@ -46,10 +52,10 @@ export default async function Dashboard() {
   const gain = Number(holdings?.cur ?? 0) - Number(holdings?.inv ?? 0);
 
   const checklist = [
-    p2 && { done: Boolean(s.monthly_income), label: "Set your monthly income", href: "/app/budget" },
+    p2 && { done: income > 0, label: "Add your income", href: "/app/budget" },
     p2 && { done: budget > 0, label: `Plan your ${monthLabel(month).split(" ")[0]} budget`, href: "/app/budget" },
-    p2 && { done: Number(expCount?.n ?? 0) > 0, label: "Log your first expense", href: "#log" },
-    p3 && { done: Number(goals?.n ?? 0) > 0, label: "Create a savings goal", href: "/app/goals" },
+    p2 && { done: Number(expCount?.n ?? 0) > 0, label: "Log your first expense", href: "/app/expenses" },
+    p3 && { done: Number(goals?.n ?? 0) > 0, label: "Create a savings goal", href: "/app/savings" },
     p3 && { done: Number(holdings?.n ?? 0) > 0, label: "Add your first investment", href: "/app/invest" },
     p4 && { done: Number(ms?.n ?? 0) > 0, label: "Start your LaunchPad roadmap", href: "/app/launchpad" },
   ].filter(Boolean) as { done: boolean; label: string; href: string }[];
@@ -105,6 +111,21 @@ export default async function Dashboard() {
             </form>
           )}
         </Card>
+      )}
+
+      {learning && (
+        <Link
+          href={`/app/learn/${learning.course.slug}/${learning.lesson.slug}`}
+          className="flex items-center gap-4 rounded-3xl bg-paper p-4 ring-1 ring-line transition hover:ring-forest/40 sm:p-5"
+        >
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-cream text-2xl" aria-hidden>{learning.course.emoji}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-bold uppercase tracking-[0.14em] text-moss">{learning.done ? "Continue learning" : "Your first lesson"}</span>
+            <span className="block truncate font-display text-lg font-bold">{learning.lesson.title}</span>
+            <span className="block text-xs text-muted">{learning.course.title} · {learning.done}/{learning.total} done · {learning.lesson.minutes} min</span>
+          </span>
+          <span className="rounded-full bg-gold px-4 py-2 text-sm font-bold text-ink">▶</span>
+        </Link>
       )}
 
       {/* Stats */}
@@ -170,14 +191,14 @@ export default async function Dashboard() {
           <Card>
             <h2 id="log" className="scroll-mt-6 font-display text-lg font-bold">Quick log</h2>
             <p className="mb-4 text-sm text-muted">Every naira you track is a naira you control.</p>
-            <ExpenseForm compact />
+            <QuickExpense categories={categories} today={today()} />
             {recent.length > 0 && (
               <ul className="mt-6 divide-y divide-line border-t border-line">
                 {recent.map((e) => (
                   <li key={e.id} className="flex items-center gap-3 py-3 text-sm">
                     <span className="text-lg" aria-hidden>{category(e.category).emoji}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{e.note || category(e.category).label}</span>
+                      <span className="block truncate font-semibold">{e.note || category(e.category).name}</span>
                       <span className="text-xs text-muted">{new Date(e.spent_on).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>
                     </span>
                     <span className="font-semibold tabular-nums">-{naira(Number(e.amount))}</span>
@@ -189,7 +210,7 @@ export default async function Dashboard() {
           <Card>
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-bold">Where it went</h2>
-              <Link href="/app/budget" className="text-sm font-semibold text-moss">Full tracker →</Link>
+              <Link href="/app/expenses" className="text-sm font-semibold text-moss">All expenses →</Link>
             </div>
             {byCat.length === 0 ? (
               <p className="mt-6 text-sm text-muted">Nothing logged this month yet. Your spending breakdown appears here.</p>
@@ -198,7 +219,7 @@ export default async function Dashboard() {
                 {byCat.map((c) => (
                   <li key={c.category}>
                     <div className="mb-1.5 flex justify-between text-sm">
-                      <span className="font-semibold">{category(c.category).emoji} {category(c.category).label}</span>
+                      <span className="font-semibold">{category(c.category).emoji} {category(c.category).name}</span>
                       <span className="tabular-nums text-muted">{naira(Number(c.v))}</span>
                     </div>
                     <Bar value={(Number(c.v) / maxCat) * 100} />

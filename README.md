@@ -69,7 +69,33 @@ Vaults are created in your Drive and shared with the student as **editor**. If t
 - Telegram (optional): add your bot as an admin of each group and set `TELEGRAM_CHAT_*`. Each student then gets a **single-use** invite link. `TELEGRAM_ADMIN_CHAT_ID` sends you payment pings.
 
 ### 5. Coach console: `/admin`
-Sign in with `ADMIN_SECRET`. It shows a **system check** of everything configured and lets you **approve bank transfers**. When a student picks "Direct bank transfer", you get an email with a one-click link that pre-fills this form.
+Sign in at `/admin/login` with `ADMIN_SECRET`. The session lasts 12 hours.
+- **Overview:** students, active this week, revenue, package mix, a "needs a nudge" list (inactive 7+ days, one-tap WhatsApp) and learning activity.
+- **Students:** search and filter. Each profile shows their money snapshot, goals, spending, course progress and payments. You can add **coach notes**, email a sign-in link, or change their package access.
+- **Enrollments:** every payment, with filters. You can approve pending bank transfers in one click (the transfer email links straight here) and retry failed onboarding.
+- **Courses:** a full learning editor with courses, modules and lessons. Lessons take YouTube, Vimeo or Loom videos and simple formatted notes. You can reorder, save drafts and publish, and each course is gated by pillar, so students only see what their package includes.
+- **System:** a checklist of every integration.
+
+### 6. Learning system: `/app/learn`
+Students get a course catalog, a lesson player with progress tracking, "complete & continue", and a "Continue learning" card on their Home screen. Five starter courses are created automatically the first time; edit or replace them in `/admin/courses`.
+
+### 7. Money tools (student app)
+- **Budget (`/app/budget`):** a Notion-style monthly sheet. Click any cell to edit it, and it saves when you press Enter or click away.
+  - Several income lines, each with a "received" tick.
+  - Your own categories (rename them, change the emoji, move them between Needs/Wants/Savings, or hide them).
+  - Live planned / spent / left for each category, and "Left to assign" for zero-based budgeting.
+  - One-click 50/30/20, Copy last month, and month notes.
+  - New months carry over last month's incomes and plan automatically.
+- **Expenses (`/app/expenses`):** an expense database with **Table** (inline editing, group by day or category, sort, multi-select delete, duplicate), **Board** (drag cards between categories) and **Calendar** views.
+  - Search and filters, plus insights: daily average, projected month-end against budget, change versus last month, and a daily chart.
+  - **Recurring bills** log themselves on their day each month.
+  - CSV export.
+- **Savings (`/app/savings`):** goals backed by a full deposit and withdrawal history.
+  - Pace status (ahead, on track, behind) and the monthly amount needed.
+  - Savings rate, a monthly streak, and a saved-per-month chart.
+  - Each goal has its own page with a growth chart, milestones (25/50/75/100%) and editable details.
+
+Amounts accept shorthand everywhere: `4.5k`, `1.2m`, `150,000`.
 
 ## Reliability
 - **Idempotent:** each payment reference is recorded in the ledger sheet. A retried webhook won't create a second vault or send a second letter, and each Drive vault is tagged with its reference.

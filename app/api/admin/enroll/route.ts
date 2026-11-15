@@ -3,7 +3,8 @@ import { z } from "zod";
 import { findOffer } from "@/lib/packages";
 import { newReference } from "@/lib/paystack";
 import { enrollStudent, type EnrollmentResult } from "@/lib/onboarding";
-import { firstError, isAdmin, studentSchema } from "@/lib/validation";
+import { firstError, studentSchema } from "@/lib/validation";
+import { isAdminRequest } from "@/lib/admin-auth";
 
 export const maxDuration = 60;
 
@@ -15,7 +16,7 @@ const schema = studentSchema.extend({
 
 /** Manual approval (bank transfer, cash, comp seats). Runs the exact same pipeline as Paystack. */
 export async function POST(req: Request) {
-  if (!isAdmin(req.headers.get("x-admin-secret"))) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!(await isAdminRequest(req))) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
   const parsed = schema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
   const d = parsed.data;

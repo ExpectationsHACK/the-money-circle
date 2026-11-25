@@ -34,6 +34,9 @@ export default async function AdminOverview() {
   ]);
 
   const total = Number(students?.n ?? 0);
+  const plansToReview = await all<{ student_id: string; full_name: string }>(
+    "SELECT f.student_id, s.full_name FROM financial_plans f JOIN students s ON s.id = f.student_id WHERE f.status = 'submitted' ORDER BY f.submitted_at LIMIT 5",
+  );
   const maxMix = Math.max(1, ...mix.map((m) => Number(m.n)));
 
   return (
@@ -47,6 +50,17 @@ export default async function AdminOverview() {
           {pending?.n} enrollment{Number(pending?.n) > 1 ? "s" : ""} need{Number(pending?.n) === 1 ? "s" : ""} your attention (pending transfers or failed onboarding)
           <span>Review →</span>
         </Link>
+      )}
+
+      {plansToReview.length > 0 && (
+        <div className="rounded-2xl bg-gold/20 px-5 py-4 text-sm ring-1 ring-gold/40">
+          <p className="font-semibold">📋 {plansToReview.length} financial plan{plansToReview.length > 1 ? "s" : ""} waiting for your review</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {plansToReview.map((p) => (
+              <Link key={p.student_id} href={`/admin/students/${p.student_id}/plan`} className="rounded-full bg-paper px-3 py-1 font-semibold ring-1 ring-line hover:bg-cream">{p.full_name} →</Link>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

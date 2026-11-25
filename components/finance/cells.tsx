@@ -94,12 +94,19 @@ export function TextCell({
     if (edit) ref.current?.select();
   }, [edit]);
 
+  const committing = useRef(false);
   async function commit() {
+    if (committing.current) return; // Enter + the blur that follows must save once
+    committing.current = true;
     setEdit(false);
-    if (draft.trim() === value.trim()) return;
+    if (draft.trim() === value.trim()) {
+      committing.current = false;
+      return;
+    }
     setBusy(true);
     const good = await runSave(onSave, draft);
     setBusy(false);
+    committing.current = false;
     if (!good) setDraft(value);
   }
 
@@ -107,6 +114,7 @@ export function TextCell({
     return (
       <input
         ref={ref}
+        autoFocus
         value={draft}
         inputMode={inputMode}
         aria-label={ariaLabel}
@@ -115,7 +123,7 @@ export function TextCell({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            (e.target as HTMLInputElement).blur();
+            void commit();
           }
           if (e.key === "Escape") {
             setDraft(value);

@@ -9,6 +9,7 @@ import { QuickExpense } from "@/components/finance/QuickExpense";
 import { categoryLookup, getCategories, monthIncomeTotal } from "@/lib/finance";
 import { loadSampleData } from "./actions";
 import { continueLearning } from "@/lib/learning";
+import { getKit } from "@/lib/onboarding-kit";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,8 @@ export default async function Dashboard() {
     one<{ n: number }>("SELECT COUNT(*) n FROM expenses WHERE student_id = ?", [s.id]),
   ]);
   const learning = await continueLearning(s.id, pkg.pillars);
+  const kit = await getKit(s);
+  const nextKitStep = kit.steps.find((x) => x.key !== "community" && !x.done);
   const categories = p2 ? await getCategories(s.id) : [];
   const category = categoryLookup(categories);
   const income = await monthIncomeTotal(s.id, month, s.monthly_income ? Number(s.monthly_income) : null);
@@ -86,6 +89,18 @@ export default async function Dashboard() {
           )}
         </div>
       </div>
+
+      {nextKitStep && (
+        <Link href="/app/welcome" className="grain flex flex-col gap-4 rounded-3xl bg-forest p-5 text-cream transition hover:bg-forest-2 sm:flex-row sm:items-center sm:p-6">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-gold">Your onboarding kit · {kit.done} of {kit.total} done</p>
+            <p className="mt-1 font-display text-xl font-bold">Next: {nextKitStep.title}</p>
+            <p className="mt-0.5 text-sm text-cream/70">{nextKitStep.locked ?? nextKitStep.body}</p>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold" style={{ width: `${(kit.done / Math.max(1, kit.total)) * 100}%` }} /></div>
+          </div>
+          <span className="self-start rounded-full bg-gold px-5 py-2.5 text-sm font-bold text-ink sm:self-center">Continue →</span>
+        </Link>
+      )}
 
       {/* Setup checklist */}
       {checklist.length > 0 && doneCount < checklist.length && (

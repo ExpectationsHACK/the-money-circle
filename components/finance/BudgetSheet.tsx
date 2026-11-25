@@ -11,6 +11,7 @@ import {
   deleteIncome,
   saveMonthNotes,
   setPlanned,
+  setStartBalance,
   updateCategory,
   updateIncome,
 } from "@/app/app/finance-actions";
@@ -36,6 +37,8 @@ export function BudgetSheet(props: {
   incomes: Income[];
   notes: string;
   canCopyLast: boolean;
+  startBalance: number | null;
+  suggestedStart: number | null;
 }) {
   const { month } = props;
   const [cats, setCats] = useState(props.categories);
@@ -46,12 +49,15 @@ export function BudgetSheet(props: {
   const [adding, setAdding] = useState<Bucket | null>(null);
   const [newCat, setNewCat] = useState({ name: "", emoji: "" });
   const [busy, setBusy] = useState(false);
+  const [startBal, setStartBal] = useState<number | null>(props.startBalance);
 
   const income = incomes.reduce((a, i) => a + Number(i.amount), 0);
   const received = incomes.filter((i) => i.received).reduce((a, i) => a + Number(i.amount), 0);
   const totalPlanned = cats.reduce((a, c) => a + (planned[c.key] ?? 0), 0);
   const totalSpent = Object.values(props.spent).reduce((a, v) => a + v, 0);
   const toAssign = income - totalPlanned;
+  const endBal = startBal === null ? null : startBal + received - totalSpent;
+  const net = received - totalSpent;
 
   const byBucket = useMemo(
     () =>
@@ -112,6 +118,51 @@ export function BudgetSheet(props: {
           <p className={`mt-1 font-display text-2xl font-bold tabular-nums ${toAssign < 0 ? "text-coral" : ""}`}>{fmt(toAssign)}</p>
           <p className={`mt-0.5 text-xs ${toAssign === 0 && income > 0 ? "text-cream/80" : toAssign < 0 ? "font-semibold text-coral" : "text-muted"}`}>
             {income === 0 ? "Start with your income" : toAssign === 0 ? "Every naira has a job ✨" : toAssign > 0 ? "Give these naira a job" : "You’ve planned more than you earn"}
+          </p>
+        </div>
+      </section>
+
+      {/* Money on hand: start → end balance (like the Money Tracker sheet) */}
+      <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-3xl bg-paper p-5 ring-1 ring-line" aria-label="Start and end balance">
+        <div className="w-40">
+          <p className="px-2 text-xs font-semibold text-muted">Start balance</p>
+          <TextCell
+            value={startBal === null ? "" : n(startBal)}
+            display={startBal === null ? undefined : fmt(startBal)}
+            placeholder="Set it"
+            ariaLabel="Start balance (money on hand at the start of the month)"
+            inputMode="decimal"
+            className="font-display text-xl font-bold"
+            onSave={async (v) => {
+              const r = await setStartBalance(month, v);
+              if (r.ok) setStartBal(r.data);
+              return r;
+            }}
+          />
+          {startBal === null && props.suggestedStart !== null && (
+            <button
+              type="button"
+              onClick={async () => {
+                const r = await setStartBalance(month, String(props.suggestedStart));
+                if (r.ok) setStartBal(r.data);
+                else toast(r.error, "error");
+              }}
+              className="px-2 text-xs font-semibold text-moss underline"
+            >
+              Use last month’s end: {fmt(props.suggestedStart)}
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-muted">
+          <span className="font-semibold text-moss">+ {fmt(received)}</span> received <span className="mx-1">·</span>
+          <span className="font-semibold text-coral">− {fmt(totalSpent)}</span> spent
+        </p>
+        <div className="ml-auto text-right">
+          <p className="text-xs font-semibold text-muted">End balance</p>
+          <p className="font-display text-xl font-bold tabular-nums">{endBal === null ? "—" : fmt(endBal)}</p>
+          <p className={`text-xs font-semibold ${net >= 0 ? "text-moss" : "text-coral"}`}>
+            {net >= 0 ? "▲ Saved" : "▼ Spent"} {fmt(Math.abs(net))} this month
+            {startBal ? ` (${net >= 0 ? "+" : "−"}${Math.abs(Math.round((net / Math.abs(startBal)) * 100))}%)` : ""}
           </p>
         </div>
       </section>

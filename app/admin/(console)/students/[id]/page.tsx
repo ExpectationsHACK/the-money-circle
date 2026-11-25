@@ -8,6 +8,7 @@ import { PACKAGES, findOffer, type Pillar } from "@/lib/packages";
 import { getStudentById, hasPillar, packageOf, programmeProgress } from "@/lib/students";
 import { ActionForm, Bar, ConfirmButton, SubmitButton } from "@/components/app/ui";
 import { input } from "@/lib/styles";
+import { getKit } from "@/lib/onboarding-kit";
 import { Empty, Panel, StatusPill, shortDate, timeAgo, waLink } from "@/components/admin/ui";
 import { addCoachNote, changeStudentPackage, deleteCoachNote, sendStudentLoginLink } from "../../../actions";
 
@@ -39,6 +40,8 @@ export default async function StudentDetail({ params }: { params: Promise<{ id: 
 
   const category = categoryLookup(await getCategories(s.id, { includeArchived: true }));
   const income = await monthIncomeTotal(s.id, month, s.monthly_income ? Number(s.monthly_income) : null);
+  const kit = await getKit(s);
+  const planRow = await one<{ status: string }>("SELECT status FROM financial_plans WHERE student_id = ?", [s.id]);
   const wa = waLink(s.phone, `Hi ${s.full_name.split(" ")[0]}! It’s your Money Buddy 👋`);
   const spentV = Number(spent?.v ?? 0);
   const budgetV = Number(budget?.v ?? 0);
@@ -165,6 +168,24 @@ export default async function StudentDetail({ params }: { params: Promise<{ id: 
         </div>
 
         <div className="space-y-6">
+          <Panel title="Onboarding" action={<span className="text-xs font-semibold text-muted">{kit.done}/{kit.total} done</span>}>
+            <ul className="space-y-2 text-sm">
+              {kit.steps.filter((x) => x.key !== "community").map((x) => (
+                <li key={x.key} className="flex items-center gap-2.5">
+                  <span className={`grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold ${x.done ? "bg-moss text-cream" : "border-2 border-line"}`}>{x.done ? "✓" : ""}</span>
+                  <span className={x.done ? "text-muted" : "font-semibold"}>
+                    {x.key === "vault" ? "Opened vault" : x.key === "plan" ? `Financial plan${x.done ? "" : ` (${x.progress ?? 0}% filled)`}` : "Booked session"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {kit.planRequired && (
+              <Link href={`/admin/students/${s.id}/plan`} className={`mt-4 block rounded-xl px-4 py-2.5 text-center text-sm font-bold ${planRow?.status === "submitted" ? "bg-gold text-ink" : "ring-1 ring-line hover:bg-cream"}`}>
+                {planRow?.status === "signed" ? "View signed plan" : planRow?.status === "submitted" ? "📋 Review & countersign plan" : "View plan draft"}
+              </Link>
+            )}
+          </Panel>
+
           <Panel title="Access">
             <ActionForm action={sendStudentLoginLink} resetOnSuccess={false}>
               <input type="hidden" name="studentId" value={s.id} />

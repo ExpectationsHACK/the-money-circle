@@ -24,6 +24,9 @@ import { appendRow, ledgerConfigured } from "./ledger";
 import { now, one, run } from "./db";
 import { upsertStudentFromEnrollment } from "./students";
 import { createLoginLink } from "./auth";
+import { sessionAgenda } from "./onboarding-kit";
+import { whatsappLink, site } from "./site";
+import { hasPillar } from "./students";
 
 export interface EnrollmentInput {
   reference: string;
@@ -169,7 +172,8 @@ export async function enrollStudent(input: EnrollmentInput): Promise<EnrollmentR
   // ---- 3 + 4. Communities + acceptance letter -----------------------------------------
   const communities = await communityLinks(pkg, input.fullName, issues);
   // Hold the letter if a vault was expected but is missing (except in console/dev mode).
-  const vaultMissing = Boolean(pkg.automation.vaultTemplateEnv && !vaultUrl) && env.emailProvider() !== "console" && env.paymentMode() !== "demo";
+  // Every student has an in-app vault, so a missing Drive copy never blocks the welcome letter (the coach is alerted instead).
+  const vaultMissing = false;
   let letterSent = false;
   if (!vaultMissing) {
     try {
@@ -178,11 +182,15 @@ export async function enrollStudent(input: EnrollmentInput): Promise<EnrollmentR
         pkg,
         offer,
         reference: input.reference,
+        siteUrl: env.siteUrl(),
         vaultUrl,
         bookingUrl,
-        appUrl: await createLoginLink(student.id),
+        appUrl: await createLoginLink(student.id, { next: "/app/welcome", minutes: 7 * 24 * 60 }),
+        planRequired: hasPillar(student, 2),
+        agenda: sessionAgenda(student),
         communities,
         resources: resourceLinks(pkg),
+        whatsappUrl: whatsappLink(`Hi ${site.coachFirstName}! I just joined The Money Circle.`) || undefined,
       });
       const sent = await sendEmail({ to: input.email, ...letter });
       letterSent = true;

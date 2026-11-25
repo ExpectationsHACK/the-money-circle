@@ -12,11 +12,17 @@ export interface AcceptanceData {
   pkg: Package;
   offer: Offer;
   reference: string;
+  /** One-tap sign-in that lands on the onboarding kit. */
+  appUrl?: string;
+  siteUrl: string;
+  /** Google Drive copy of the vault, when one was created. */
   vaultUrl?: string;
   bookingUrl?: string;
-  appUrl?: string;
+  planRequired: boolean;
+  agenda: string[];
   communities: LetterLink[];
   resources: LetterLink[];
+  whatsappUrl?: string;
 }
 
 const C = {
@@ -57,103 +63,114 @@ ${esc(site.name)} · ${esc(site.tagline)}<br>You're receiving this because you e
 </table></td></tr></table></body></html>`;
 }
 
+/** Kit item block: number badge, title, body, and buttons. */
+function kitItem(n: number, title: string, body: string, links: LetterLink[]): string {
+  return `<tr><td style="padding:10px 32px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.cream};border-radius:16px"><tr>
+    <td style="width:44px;padding:16px 0 16px 16px;vertical-align:top"><div style="width:32px;height:32px;border-radius:16px;background:${C.gold};color:${C.ink};font-weight:800;text-align:center;line-height:32px">${n}</div></td>
+    <td style="padding:16px 18px 16px 12px;font-size:15px;line-height:1.6">
+      <div style="font-weight:800;font-size:16px">${title}</div>
+      <div style="color:${C.muted};margin-top:4px">${body}</div>
+      ${links
+        .map(
+          (l, i) =>
+            `<a href="${esc(l.url)}" style="display:inline-block;margin:10px 8px 0 0;background:${i === 0 ? C.green : "#FFFFFF"};color:${i === 0 ? "#FFFFFF" : C.green};border:1px solid ${C.green};text-decoration:none;font-weight:700;font-size:14px;padding:10px 16px;border-radius:10px">${esc(l.label)} &rarr;</a>`,
+        )
+        .join("")}
+    </td>
+  </tr></table>
+</td></tr>`;
+}
+
+/** The official welcome letter, written in the coach's voice. */
 export function acceptanceLetter(d: AcceptanceData): { subject: string; html: string; text: string } {
   const name = firstName(d.fullName);
+  const coach = `${site.coachFirstName} (${site.coachName})`;
   const vip = Boolean(d.pkg.vip);
-  const subject = vip
-    ? `${name}, welcome to The Billionaire Circle 👑 Your VIP acceptance letter`
-    : `${name}, you're in! Your official ${d.pkg.name} acceptance letter 🎉`;
+  const subject = `${name}, welcome to The Money Circle 🎉 Your onboarding kit is inside`;
+  const kitUrl = d.appUrl ?? `${d.siteUrl}/app/welcome`;
+  const lower = (x: string) => x[0].toLowerCase() + x.slice(1);
+  const agendaText = d.agenda.length > 1 ? `${d.agenda.slice(0, -1).map(lower).join(", ")} and ${lower(d.agenda[d.agenda.length - 1])}` : d.agenda.map(lower).join("");
+  const siteHost = d.siteUrl.replace(/^https?:\/\//, "");
 
-  const opening = vip
-    ? `This is your official VIP acceptance into <strong>The Billionaire Circle</strong>, our all-access, six-month transformation. You didn't just pick a programme. You picked <em>everything</em>: structure for your income, a portfolio that works while you sleep, and a brand-new income stream. I'm honoured you trust me with this.`
-    : d.pkg.route === "launchpad"
-      ? `This is your official acceptance into <strong>LaunchPad</strong>. You've decided your skills deserve to pay you, and that's the kind of decision that changes a bank balance. From today we stop planning and start <em>executing</em>, milestone by milestone, until that first sale lands.`
-      : d.pkg.route === "academy"
-        ? `This is your official acceptance into <strong>The Money Circle Academy</strong>. Taking a hard look at your money takes guts, and you just did it. We're going to heal your relationship with money, rewire the old habits and build foundations that actually hold.`
-        : `This is your official acceptance into <strong>Foundation &amp; Wealth</strong>, your six-month journey from reactive spending to real structure, real savings and real investments. The leaking stops here. The building starts now.`;
-
-  const primary: LetterLink[] = [];
-  if (d.vaultUrl) primary.push({ label: d.pkg.automation.vaultLabel ?? "Open your Money Vault", url: d.vaultUrl });
-  if (d.bookingUrl) primary.push({ label: d.pkg.automation.bookingLabel, url: d.bookingUrl });
-  if (d.appUrl) primary.push({ label: "Open your Money Circle app", url: d.appUrl });
-
-  const steps: string[] = [];
-  if (d.appUrl)
-    steps.push(`<strong>Sign in to your Money Circle app.</strong> Your dashboard, budget, goals and trackers live there, on your phone or laptop.`);
-  if (d.vaultUrl)
-    steps.push(
-      `<strong>Open your personal Vault.</strong> I've built it just for you. Every tracker inside has your name on it and is shared privately with this email address.`,
-    );
+  type Item = { title: string; body: string; links: LetterLink[] };
+  const items: Item[] = [];
+  items.push({
+    title: "Your personal vault",
+    body:
+      "Your personal vault contains your financial tools" +
+      (d.planRequired ? ": your financial plan, money tracker, savings goals" : "") +
+      (d.pkg.pillars.includes(4) ? " and LaunchPad project tracker" : "") +
+      ".",
+    links: [{ label: "Open my vault", url: `${d.siteUrl}/app/vault` }, ...(d.vaultUrl ? [{ label: "Google Drive copy", url: d.vaultUrl }] : [])],
+  });
+  if (d.planRequired)
+    items.push({
+      title: "Fill out your financial plan",
+      body: "Kindly ensure you fill out your financial plan <strong>before</strong> your next session. It takes about 20 minutes and saves as you go.",
+      links: [{ label: "Start my financial plan", url: `${d.siteUrl}/app/plan` }],
+    });
   if (d.bookingUrl)
-    steps.push(
-      d.pkg.route === "academy"
-        ? `<strong>Save the Money Therapy dates.</strong> Our live group calls are where the breakthroughs happen.`
-        : `<strong>Book your first ${d.pkg.route === "launchpad" ? "kickoff session" : "Money Date"}.</strong> Pick any open slot on my calendar. The short questionnaire helps me prepare for you.`,
-    );
-  if (d.communities.length) steps.push(`<strong>Join your circle${d.communities.length > 1 ? "s" : ""}.</strong> Say hi, introduce yourself, and tell us your #1 money goal.`);
-  if (d.resources.length) steps.push(`<strong>Start a masterclass.</strong> Budgeting 101 is a perfect first watch.`);
+    items.push({
+      title: "Book your next session",
+      body: `Book your next session with this link. Our next session will be to ${esc(agendaText)}.`,
+      links: [{ label: "Book my session", url: d.bookingUrl }],
+    });
+  if (d.communities.length) items.push({ title: "Join your circle", body: "Say hi, introduce yourself, and tell us your #1 money goal.", links: d.communities });
+  if (d.resources.length) items.push({ title: "Start learning", body: "Budgeting 101 is a perfect first watch.", links: d.resources });
 
   const price = `${formatNaira(d.offer.priceNaira)}${billingSuffix(d.offer.billing)}`;
-
   const inner = `
 <tr><td style="background:${C.green};padding:32px;color:#FFFFFF">
-  <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:${C.gold};font-weight:700">${vip ? "VIP Acceptance Letter" : "Official Acceptance Letter"}</div>
-  <div style="font-size:28px;line-height:1.2;font-weight:800;margin-top:10px">Congratulations, ${esc(name)}.<br>You're officially in the Circle.</div>
+  <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:${C.gold};font-weight:700">${vip ? "VIP · " : ""}Official welcome</div>
+  <div style="font-size:28px;line-height:1.2;font-weight:800;margin-top:10px">Welcome to The Money Circle, ${esc(name)}.</div>
 </td></tr>
-<tr><td style="padding:28px 32px 8px;font-size:16px;line-height:1.65">
-  <p style="margin:0 0 16px">Dear ${esc(d.fullName)},</p>
-  <p style="margin:0 0 16px">${opening}</p>
-  <p style="margin:0 0 8px">Everything you need is ready and waiting. No forms, no waiting on me:</p>
+<tr><td style="padding:28px 32px 8px;font-size:16px;line-height:1.7">
+  <p style="margin:0 0 16px">Dear billionaire,</p>
+  <p style="margin:0 0 16px">It is with pleasure that I write to officially welcome you into <strong>The Money Circle</strong>${vip ? " as a member of <strong>The Billionaire Circle</strong>" : ` (${esc(d.pkg.name)})`}. A huge congratulations on taking this massive step toward financial freedom. I am genuinely excited to walk this journey with you.</p>
+  <p style="margin:0 0 4px">Below is everything you need to get started. <strong>Please save this email!</strong></p>
 </td></tr>
-<tr><td style="padding:8px 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-  ${primary.map((l, i) => button(l, i === 0)).join("")}
-  ${d.communities.map((l) => button(l, false)).join("")}
-  ${d.resources.map((l) => button(l, false)).join("")}
-</table></td></tr>
-${
-  steps.length
-    ? `<tr><td style="padding:20px 32px 8px;font-size:15px;line-height:1.6">
-  <div style="font-weight:800;font-size:17px;margin-bottom:10px">Your first 48 hours</div>
-  <ol style="margin:0;padding-left:20px">${steps.map((s) => `<li style="margin-bottom:10px">${s}</li>`).join("")}</ol>
-</td></tr>`
-    : ""
-}
-<tr><td style="padding:12px 32px 8px">
+<tr><td style="padding:14px 32px 4px"><div style="font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:${C.muted};font-weight:800">Your onboarding kit</div></td></tr>
+${items.map((it, i) => kitItem(i + 1, it.title, it.body, it.links)).join("")}
+<tr><td style="padding:14px 32px 0">
+  <a href="${esc(kitUrl)}" style="display:block;background:${C.gold};color:${C.ink};text-decoration:none;font-weight:800;font-size:16px;padding:16px 20px;border-radius:12px;text-align:center">Open my onboarding kit &rarr;</a>
+  <div style="font-size:12px;color:${C.muted};text-align:center;margin-top:6px">This button signs you in instantly, one time, for 7 days. After that, sign in with your email at ${esc(siteHost)}/login.</div>
+</td></tr>
+<tr><td style="padding:20px 32px 8px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.cream};border-radius:14px;font-size:13px;color:${C.muted}">
     <tr><td style="padding:14px 18px;line-height:1.7">
       <strong style="color:${C.ink}">Enrolment summary</strong><br>
-      Programme: ${esc(d.pkg.name)}, ${esc(d.offer.label)}<br>
-      Duration: ${esc(d.pkg.duration)}<br>
-      Paid: ${esc(price)}<br>
-      Reference: ${esc(d.reference)}
+      Programme: ${esc(d.pkg.name)}, ${esc(d.offer.label)} · ${esc(d.pkg.duration)}<br>
+      Paid: ${esc(price)} · Reference: ${esc(d.reference)}
     </td></tr>
   </table>
 </td></tr>
-<tr><td style="padding:20px 32px 28px;font-size:16px;line-height:1.65">
-  <p style="margin:0 0 16px">The next six months will not look like the last six. I'll be in your corner the whole way, cheering the wins and calling you higher when it gets hard.</p>
-  <p style="margin:0">Let's get this money,<br><strong>${esc(site.coachName)}</strong><br><span style="color:${C.muted}">${esc(site.name)}</span></p>
+<tr><td style="padding:16px 32px 28px;font-size:16px;line-height:1.7">
+  <p style="margin:0 0 16px">If you have any questions, please reply to this email${d.whatsappUrl ? ` or <a href="${esc(d.whatsappUrl)}" style="color:${C.green};font-weight:700">send a WhatsApp message</a>` : ""}.</p>
+  <p style="margin:0">With all my love,<br><strong>${esc(coach)}</strong><br><span style="color:${C.muted}">${esc(site.coachTitle)}</span></p>
 </td></tr>`;
 
   const text = [
-    `Congratulations, ${name}! You're officially in ${site.name}.`,
+    "Dear billionaire,",
     "",
-    `Dear ${d.fullName},`,
+    "It is with pleasure that I write to officially welcome you into The Money Circle. A huge congratulations on taking this massive step toward financial freedom. I am genuinely excited to walk this journey with you.",
     "",
-    opening.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&"),
+    "Below is everything you need to get started. Please save this email!",
     "",
-    ...primary.map((l) => `${l.label}: ${l.url}`),
-    ...d.communities.map((l) => `${l.label}: ${l.url}`),
-    ...d.resources.map((l) => `${l.label}: ${l.url}`),
+    "YOUR ONBOARDING KIT",
+    ...items.flatMap((it, i) => [`${i + 1}. ${it.title}: ${it.body.replace(/<[^>]+>/g, "")}`, ...it.links.map((l) => `   ${l.label}: ${l.url}`), ""]),
+    `Open your onboarding kit (signs you in): ${kitUrl}`,
     "",
-    `Programme: ${d.pkg.name}, ${d.offer.label}`,
-    `Paid: ${price}`,
-    `Reference: ${d.reference}`,
+    `Programme: ${d.pkg.name}, ${d.offer.label} · Paid: ${price} · Reference: ${d.reference}`,
     "",
-    `Let's get this money,`,
-    site.coachName,
+    `If you have any questions, please reply to this email${d.whatsappUrl ? ` or send a WhatsApp message: ${d.whatsappUrl}` : ""}.`,
+    "",
+    "With all my love,",
+    coach,
+    site.coachTitle,
   ].join("\n");
 
-  return { subject, html: shell(inner, `Your ${d.pkg.name} vault, booking link and community access are inside.`), text };
+  return { subject, html: shell(inner, "Your vault, financial plan and session booking link are inside. Please save this email!"), text };
 }
 
 export function adminNotification(d: {

@@ -178,6 +178,54 @@ CREATE TABLE IF NOT EXISTS goal_deposits (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS deposits_goal ON goal_deposits (goal_id, deposited_on);
+CREATE TABLE IF NOT EXISTS financial_plans (
+  student_id TEXT PRIMARY KEY,
+  data TEXT NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'draft',
+  client_signature TEXT,
+  submitted_at TEXT,
+  coach_signed_at TEXT,
+  coach_note TEXT,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lp_projects (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  revenue_target INTEGER NOT NULL DEFAULT 0,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lp_tasks (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'not-started',
+  priority TEXT NOT NULL DEFAULT 'medium',
+  start_on TEXT,
+  end_on TEXT,
+  description TEXT NOT NULL DEFAULT '',
+  deliverable TEXT NOT NULL DEFAULT '',
+  pct INTEGER NOT NULL DEFAULT 0,
+  cost INTEGER NOT NULL DEFAULT 0,
+  est_hours REAL NOT NULL DEFAULT 0,
+  actual_hours REAL NOT NULL DEFAULT 0,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS lp_tasks_project ON lp_tasks (project_id, sort);
+CREATE TABLE IF NOT EXISTS lp_sales (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  sold_on TEXT NOT NULL,
+  client TEXT NOT NULL DEFAULT '',
+  amount INTEGER NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
 `;
 
 /** Additive changes for databases created by earlier versions. Each runs once; "duplicate column" errors are ignored. */
@@ -189,6 +237,10 @@ const MIGRATIONS = [
   "ALTER TABLE expenses ADD COLUMN recurring_id TEXT",
   "ALTER TABLE goals ADD COLUMN emoji TEXT NOT NULL DEFAULT '🎯'",
   "ALTER TABLE goals ADD COLUMN achieved_at TEXT",
+  "ALTER TABLE students ADD COLUMN welcome_seen_at TEXT",
+  "ALTER TABLE students ADD COLUMN vault_opened_at TEXT",
+  "ALTER TABLE students ADD COLUMN session_booked_at TEXT",
+  "ALTER TABLE month_meta ADD COLUMN start_balance INTEGER",
 ];
 
 const g = globalThis as unknown as { __tmcDb?: Client; __tmcDbReady?: Promise<void> };

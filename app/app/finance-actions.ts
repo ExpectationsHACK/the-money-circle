@@ -199,6 +199,19 @@ export async function deleteIncome(incomeId: string): Promise<Result<null>> {
   return ok(null);
 }
 
+export async function setStartBalance(month: string, raw: string): Promise<Result<number | null>> {
+  const s = await me(2);
+  if (!isMonth(month)) return fail("Invalid month");
+  const v = String(raw ?? "").trim() === "" ? null : money(String(raw).replace(/^-/, "")) * (String(raw).trim().startsWith("-") ? -1 : 1);
+  if (v !== null && Number.isNaN(v)) return fail("Enter an amount like 120k");
+  await run(
+    "INSERT INTO month_meta (student_id, month, notes, initialized, start_balance) VALUES (?, ?, '', 0, ?) ON CONFLICT(student_id, month) DO UPDATE SET start_balance = excluded.start_balance",
+    [s.id, month, v],
+  );
+  touch();
+  return ok(v);
+}
+
 export async function saveMonthNotes(month: string, notes: string): Promise<Result<null>> {
   const s = await me(2);
   if (!isMonth(month)) return fail("Invalid month");

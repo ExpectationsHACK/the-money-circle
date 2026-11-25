@@ -6,6 +6,8 @@ import { hasPillar } from "@/lib/students";
 import { ActionForm, ConfirmButton, Locked, SubmitButton } from "@/components/app/ui";
 import { input } from "@/lib/styles";
 import { addMilestone, deleteMilestone, startMilestones, toggleMilestone } from "../actions";
+import { getProjects } from "@/lib/launchpad";
+import { ProjectTracker } from "@/components/launchpad/ProjectTracker";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function LaunchPadPage() {
     "SELECT id, title, done, done_at FROM milestones WHERE student_id = ? ORDER BY sort, rowid",
     [s.id],
   );
+  const projects = await getProjects(s.id);
   const done = ms.filter((m) => Number(m.done)).length;
   const next = ms.find((m) => !Number(m.done));
 
@@ -90,6 +93,7 @@ export default async function LaunchPadPage() {
           </section>
         </>
       )}
+      <ProjectTracker initial={projects} />
     </div>
   );
 }

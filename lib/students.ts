@@ -14,6 +14,9 @@ export interface Student {
   started_at: string;
   created_at: string;
   last_seen_at: string | null;
+  welcome_seen_at: string | null;
+  vault_opened_at: string | null;
+  session_booked_at: string | null;
 }
 
 export function packageOf(s: Student): Package {

@@ -1,5 +1,5 @@
 import { requireStudent } from "@/lib/auth";
-import { ensureMonth, getCategories, getIncomes, getMonthNotes, getPlanned, spentByCategory } from "@/lib/finance";
+import { ensureMonth, getCategories, getIncomes, getMonthNotes, getPlanned, getStartBalance, spentByCategory } from "@/lib/finance";
 import { currentMonth, isMonth, monthLabel, shiftMonth } from "@/lib/money";
 import { PILLARS } from "@/lib/packages";
 import { hasPillar } from "@/lib/students";
@@ -17,13 +17,14 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const month = isMonth(sp.m) ? sp.m : currentMonth();
   await ensureMonth(s.id, month, s.monthly_income ? Number(s.monthly_income) : null);
 
-  const [categories, planned, spent, incomes, notes, prevPlanned] = await Promise.all([
+  const [categories, planned, spent, incomes, notes, prevPlanned, start] = await Promise.all([
     getCategories(s.id),
     getPlanned(s.id, month),
     spentByCategory(s.id, month),
     getIncomes(s.id, month),
     getMonthNotes(s.id, month),
     getPlanned(s.id, shiftMonth(month, -1)),
+    getStartBalance(s.id, month),
   ]);
 
   return (
@@ -40,6 +41,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
       incomes={incomes}
       notes={notes}
       canCopyLast={Object.keys(prevPlanned).length > 0}
+      startBalance={start.value}
+      suggestedStart={start.suggested}
     />
   );
 }

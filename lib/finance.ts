@@ -159,6 +159,20 @@ export async function getMonthNotes(studentId: string, month: string): Promise<s
   return r?.notes ?? "";
 }
 
+/** Money on hand at the start of the month: saved value, or last month's end balance if it can be worked out. */
+export async function getStartBalance(studentId: string, month: string): Promise<{ value: number | null; suggested: number | null }> {
+  const meta = await one<{ start_balance: number | null }>("SELECT start_balance FROM month_meta WHERE student_id = ? AND month = ?", [studentId, month]);
+  if (meta?.start_balance !== null && meta?.start_balance !== undefined) return { value: Number(meta.start_balance), suggested: null };
+  const prev = shiftMonth(month, -1);
+  const pm = await one<{ start_balance: number | null }>("SELECT start_balance FROM month_meta WHERE student_id = ? AND month = ?", [studentId, prev]);
+  if (pm?.start_balance === null || pm?.start_balance === undefined) return { value: null, suggested: null };
+  const [inc, sp] = await Promise.all([
+    one<{ v: number }>("SELECT COALESCE(SUM(amount),0) v FROM incomes WHERE student_id = ? AND month = ? AND received = 1", [studentId, prev]),
+    one<{ v: number }>("SELECT COALESCE(SUM(amount),0) v FROM expenses WHERE student_id = ? AND substr(spent_on,1,7) = ?", [studentId, prev]),
+  ]);
+  return { value: null, suggested: Number(pm.start_balance) + Number(inc?.v ?? 0) - Number(sp?.v ?? 0) };
+}
+
 export async function getIncomes(studentId: string, month: string): Promise<Income[]> {
   return all<Income>("SELECT id, month, source, amount, received, sort FROM incomes WHERE student_id = ? AND month = ? ORDER BY sort, rowid", [studentId, month]);
 }

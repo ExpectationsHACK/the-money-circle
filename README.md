@@ -97,6 +97,22 @@ Students get a course catalog, a lesson player with progress tracking, "complete
 
 Amounts accept shorthand everywhere: `4.5k`, `1.2m`, `150,000`.
 
+### 8. Onboarding kit (automated welcome)
+After payment, every student receives the coach's welcome letter ("Dear billionaire…") with their **onboarding kit**. Their sign-in button lasts 7 days and lands on `/app/welcome`:
+1. **Personal vault** (`/app/vault`): every financial tool in one place.
+2. **Financial Plan** (`/app/plan`): an interactive version of the 6-month plan document.
+   - Where you are now (income, savings, debts), Where you want to be, and Your action plan (50/30/20-style split, PiggyVest plan, debt payoff, investment profile and mix).
+   - Live net worth, emergency cover, debt-to-income and the coach's checks.
+   - Imports figures from the tracker, autosaves, and can turn its targets into savings goals.
+   - The student signs it, then a printable PDF is available at `/app/plan/print`.
+3. **Book your next session:** the Calendly link (`BOOKING_*_URL`) unlocks once the plan is submitted, with name and email pre-filled. The agenda names next month automatically ("work on your budget for December") and includes the LaunchPad breakdown for LaunchPad members.
+
+Coaches get an email when a plan is submitted (`ADMIN_EMAIL`). They then review and **countersign** with a note at `/admin/students/[id]/plan`; plans waiting for review show on the admin overview.
+
+The **LaunchPad Project Tracker** (`/app/launchpad`) mirrors the project-tracking sheet: tasks with status, priority, dates, duration, deliverable, % done, cost and hours, rolled up per project. It also has a one-click sales-project template and a sales log against a revenue target. The Budget page now has **start and end balance**, like the Money Tracker sheet.
+
+Set the coach's name and contact with `NEXT_PUBLIC_COACH_NAME` and `NEXT_PUBLIC_CONTACT_EMAIL`.
+
 ## Reliability
 - **Idempotent:** each payment reference is recorded in the ledger sheet. A retried webhook won't create a second vault or send a second letter, and each Drive vault is tagged with its reference.
 - **Self-healing:** if a step fails, the webhook returns an error so Paystack retries it later, and you get a "needs attention" alert. The acceptance letter is held back until the vault exists, so no student gets a broken welcome.

@@ -283,3 +283,20 @@ export async function deleteLesson(fd: FormData) {
   revalidatePath("/app/learn", "layout");
   redirect(`/admin/courses/${cid}`);
 }
+
+// ---------- Financial plans ----------
+
+export async function countersignPlan(_: AdminState, fd: FormData): Promise<AdminState> {
+  await requireAdmin();
+  const studentId = str(fd, "studentId");
+  const note = str(fd, "note", 1000);
+  const sign = str(fd, "sign") === "1";
+  const plan = await one<{ status: string }>("SELECT status FROM financial_plans WHERE student_id = ?", [studentId]);
+  if (!plan) return { error: "This student hasn’t started a plan yet." };
+  if (sign && plan.status === "draft") return { error: "The student needs to submit the plan before you can sign it." };
+  if (sign) await run("UPDATE financial_plans SET status = 'signed', coach_signed_at = ?, coach_note = ? WHERE student_id = ?", [now(), note || null, studentId]);
+  else await run("UPDATE financial_plans SET coach_note = ? WHERE student_id = ?", [note || null, studentId]);
+  revalidatePath(`/admin/students/${studentId}`, "layout");
+  revalidatePath("/app", "layout");
+  return { ok: sign ? "Plan countersigned ✍️ The student can see your signature and note." : "Note saved" };
+}

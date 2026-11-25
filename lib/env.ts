@@ -37,7 +37,7 @@ export const env = {
   // Email
   emailProvider: () => (read("EMAIL_PROVIDER") ?? "gmail") as "gmail" | "resend" | "console",
   emailFrom: () => read("EMAIL_FROM"),
-  emailFromName: () => read("EMAIL_FROM_NAME") ?? "Your Money Buddy",
+  emailFromName: () => read("EMAIL_FROM_NAME") ?? "The Money Circle",
   emailReplyTo: () => read("EMAIL_REPLY_TO"),
   resendApiKey: () => read("RESEND_API_KEY"),
   adminEmail: () => read("ADMIN_EMAIL"),

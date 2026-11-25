@@ -63,14 +63,15 @@ export async function requireStudent(): Promise<Student> {
   return s;
 }
 
-export async function createLoginLink(studentId: string): Promise<string> {
+export async function createLoginLink(studentId: string, opts: { next?: string; minutes?: number } = {}): Promise<string> {
   const token = crypto.randomBytes(32).toString("base64url");
   await run("INSERT INTO login_tokens (token_hash, student_id, expires_at) VALUES (?, ?, ?)", [
     sha(token),
     studentId,
-    Date.now() + LINK_MINUTES * 60_000,
+    Date.now() + (opts.minutes ?? LINK_MINUTES) * 60_000,
   ]);
-  return `${env.siteUrl()}/auth/verify?token=${token}`;
+  const next = opts.next && opts.next.startsWith("/app") ? `&next=${encodeURIComponent(opts.next)}` : "";
+  return `${env.siteUrl()}/auth/verify?token=${token}${next}`;
 }
 
 /** Consumes a magic-link token. Returns the student id or null. */

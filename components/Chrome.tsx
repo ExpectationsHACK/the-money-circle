@@ -19,7 +19,8 @@ export function Header() {
     <header className="absolute inset-x-0 top-0 z-30">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
         <Logo light />
-        <nav className="hidden items-center gap-8 text-sm font-medium text-cream/80 md:flex">
+        <nav className="hidden items-center gap-6 text-sm font-medium text-cream/80 lg:gap-8 md:flex">
+          <a href="#coach" className="hover:text-cream">Meet {site.coachFirstName}</a>
           <a href="#system" className="hover:text-cream">The Big 4</a>
           <a href="#packages" className="hover:text-cream">Packages</a>
           <a href="#how" className="hover:text-cream">How it works</a>

@@ -166,7 +166,7 @@ export async function deleteCourse(fd: FormData) {
 }
 
 /** Swaps an item with its neighbour, normalising sort values first. */
-async function reorder(table: "courses" | "modules" | "lessons", scope: string, scopeArgs: string[], itemId: string, dir: -1 | 1) {
+async function reorder(table: "courses" | "modules" | "lessons" | "testimonials", scope: string, scopeArgs: string[], itemId: string, dir: -1 | 1) {
   const rows = await all<{ id: string }>(`SELECT id FROM ${table} WHERE ${scope} ORDER BY sort, rowid`, scopeArgs);
   const i = rows.findIndex((r) => r.id === itemId);
   const j = i + dir;
@@ -299,4 +299,49 @@ export async function countersignPlan(_: AdminState, fd: FormData): Promise<Admi
   revalidatePath(`/admin/students/${studentId}`, "layout");
   revalidatePath("/app", "layout");
   return { ok: sign ? "Plan countersigned ✍️ The student can see your signature and note." : "Note saved" };
+}
+
+// ---------- Testimonials ----------
+
+function revalidateTestimonials() {
+  revalidatePath("/admin/testimonials");
+  revalidatePath("/");
+}
+
+export async function saveTestimonial(_: AdminState, fd: FormData): Promise<AdminState> {
+  await requireAdmin();
+  const tid = str(fd, "id");
+  const name = str(fd, "name", 80);
+  const quote = str(fd, "quote", 1200);
+  const detail = str(fd, "detail", 120);
+  const highlight = str(fd, "highlight", 80);
+  if (!name || !quote) return { error: "Add the student’s name and what they said" };
+  if (tid) {
+    await run("UPDATE testimonials SET name = ?, detail = ?, quote = ?, highlight = ? WHERE id = ?", [name, detail, quote, highlight, tid]);
+  } else {
+    await run(
+      "INSERT INTO testimonials (id, name, detail, quote, highlight, published, sort, created_at) VALUES (?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort), 0) + 1 FROM testimonials), ?)",
+      [id(), name, detail, quote, highlight, now()],
+    );
+  }
+  revalidateTestimonials();
+  return { ok: tid ? "Testimonial updated" : "Testimonial published on the homepage 🎉" };
+}
+
+export async function toggleTestimonial(fd: FormData) {
+  await requireAdmin();
+  await run("UPDATE testimonials SET published = 1 - published WHERE id = ?", [str(fd, "id")]);
+  revalidateTestimonials();
+}
+
+export async function moveTestimonial(fd: FormData) {
+  await requireAdmin();
+  await reorder("testimonials", "1 = 1", [], str(fd, "id"), str(fd, "dir") === "up" ? -1 : 1);
+  revalidateTestimonials();
+}
+
+export async function deleteTestimonial(fd: FormData) {
+  await requireAdmin();
+  await run("DELETE FROM testimonials WHERE id = ?", [str(fd, "id")]);
+  revalidateTestimonials();
 }

@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin/students", label: "Students", icon: "👥" },
   { href: "/admin/enrollments", label: "Enrollments", icon: "₦" },
   { href: "/admin/courses", label: "Courses", icon: "🎓" },
+  { href: "/admin/testimonials", label: "Testimonials", icon: "💬" },
   { href: "/admin/system", label: "System", icon: "⚙" },
 ];
 

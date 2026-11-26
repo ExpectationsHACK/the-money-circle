@@ -226,6 +226,16 @@ CREATE TABLE IF NOT EXISTS lp_sales (
   note TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS testimonials (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  quote TEXT NOT NULL,
+  highlight TEXT NOT NULL DEFAULT '',
+  published INTEGER NOT NULL DEFAULT 1,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
 `;
 
 /** Additive changes for databases created by earlier versions. Each runs once; "duplicate column" errors are ignored. */

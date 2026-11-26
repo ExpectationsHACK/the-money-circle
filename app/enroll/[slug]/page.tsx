@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Logo } from "@/components/Chrome";
 import { EnrollForm, type BankDetails } from "@/components/EnrollForm";
 import { allOfferSlugs, billingSuffix, findOffer, formatNaira } from "@/lib/packages";
-import { whatsappLink } from "@/lib/site";
+import { site, whatsappLink } from "@/lib/site";
 
 export function generateStaticParams() {
   return allOfferSlugs().map((slug) => ({ slug }));
@@ -27,6 +27,14 @@ export default async function EnrollPage({ params }: { params: Promise<{ slug: s
   if (!found) notFound();
   const { pkg, offer } = found;
   const price = `${formatNaira(offer.priceNaira)}${billingSuffix(offer.billing)}`;
+  const hasPlan = pkg.pillars.includes(2);
+  const afterPay = [
+    `A personal welcome letter from ${site.coachFirstName}, your Money Buddy, lands in your inbox with your onboarding kit.`,
+    pkg.route === "academy"
+      ? "One tap signs you in to your classes, lessons and the community."
+      : `One tap opens your private vault${hasPlan ? ", where you fill out your 6-month financial plan" : ""}.`,
+    ...(pkg.route === "academy" ? [] : [`You book your first one-on-one session${hasPlan ? " once your plan is in" : ""}.`]),
+  ];
 
   return (
     <div className="min-h-screen bg-cream">
@@ -61,11 +69,16 @@ export default async function EnrollPage({ params }: { params: Promise<{ slug: s
           <div className="mt-8 rounded-2xl bg-white/5 p-5 text-sm ring-1 ring-white/10">
             <p className="font-semibold text-gold">What happens after you pay</p>
             <ol className="mt-3 space-y-2 text-cream/75">
-              {pkg.automation.vaultTemplateEnv && <li>1. Your private {pkg.automation.vaultLabel?.replace("Open your ", "") ?? "Vault"} is built in Google Drive.</li>}
-              <li>{pkg.automation.vaultTemplateEnv ? "2" : "1"}. Your official acceptance letter lands in your inbox.</li>
-              <li>{pkg.automation.vaultTemplateEnv ? "3" : "2"}. You {pkg.route === "academy" ? "join the community and see the call schedule" : "book your first 1-on-1 session"} from the letter.</li>
+              {afterPay.map((x, i) => (
+                <li key={x}>{i + 1}. {x}</li>
+              ))}
             </ol>
           </div>
+
+          <p className="mt-6 text-sm leading-relaxed text-cream/70">
+            <span className="font-semibold text-gold">Heads up:</span> this requires work (tracking, budgeting, showing up), but evidence go show. If you’re
+            ready for Choice B, welcome home. 💛
+          </p>
         </section>
 
         <section>
